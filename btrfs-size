@@ -1,6 +1,11 @@
 #!/usr/bin/python
 
-import os, subprocess, sys
+# author: Bernhard Kirchen <schlimmchen@yahoo.de>
+# inspired by Kyle Agronick <agronick@gmail.com>
+
+# this file is licensed unter the MIT license. see file LICENSE.
+
+import os, subprocess, sys, re
 
 def __try_command(cmd, description):
     """ executes a command and returns the standard and error output together
