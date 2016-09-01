@@ -7,6 +7,9 @@
 
 import os, subprocess, sys, re
 
+# widths of columns to be printed
+__collen = { "id" : 0, "name" : 0 }
+
 def __try_command(cmd, description):
     """ executes a command and returns the standard and error output together
         with an error indication """
@@ -21,14 +24,42 @@ def __try_command(cmd, description):
 
     return (False, None) # error
 
+def __human_readable(size):
+    """ converts the given int into a human readable size rounded to one
+        digit after the decimal point and padded to a fixed string length """
+    # the spaces after the base unit 'B' are for alignment
+    powers = { 0 : "B  ", 1 : "KiB", 2 : "MiB", 3 : "GiB", 4 : "TiB", 5 : "EiB" }
+    i = 0
+    size = float(size)
+    while size >= 1024:
+        i += 1
+        size /= 1024
+    # max value is "1023.9" plus space plus 3 chars for unit = 10 chars
+    val = str(round(size, 1)) + ' ' + powers[i]
+    val = " "*(10-len(val)) + val
+    return val
+
+def __print_header():
+    """ prints the table header with respect for the given column widths """
+    __collen["id"] = max(__collen["id"], 2) # min is "ID"
+    __collen["name"] = max(__collen["name"], 14) # min is "Subvolume Name"
+    print "ID%s | Subvolume Name %s|       Used |  Exclusive" % (" "*(__collen["id"]-2), " "*(__collen["name"]-14))
+
+def __print_ruler():
+    """ prints a ruler with respect for the given column widths """
+    print "%s-+-%s-+-%s-+-%s" % ("-"*__collen["id"], "-"*__collen["name"], "-"*10, "-"*10)
+
+def __print_row(vol_id, vol_name, used, excl):
+    """ prints a table row with all the relevant information in proper alignment """
+    print "%s%s | %s%s | %s | %s" % (vol_id, " "*(__collen["id"]-len(vol_id)),
+                                     vol_name, " "*(__collen["name"]-len(vol_name)),
+                                     used, excl)
 def main():
     if os.geteuid() != 0:
         print "WARNING: This script will probably fail without root privileges!"
 
     # TODO (BKirchen, 2016-09-01): make these configurable via parameters
     btrfs_path = "/"
-
-    subvolumes = list()
 
     success, out = __try_command(["btrfs", "subvolume", "list", btrfs_path], "listing subvolumes")
     if not success:
@@ -39,16 +70,38 @@ def main():
         print "It seems there are no subvolumes in this btrfs."
         sys.exit(0)
 
-    # we need the ninth column of every output line as subvolume name
-    subvolumes = [line.split(' ')[8].strip() for line in out.split('\n') if line.strip()]
-    for vol in subvolumes:
-        print vol
+    subvolumes = dict()
+    for line in out.split('\n'):
+        if not line: continue
+        cols = line.split(' ')
+        # second col = subvol ID, ninth col = subvol name
+        subvolumes[cols[1].strip()] = cols[8].strip()
 
     success, out = __try_command(["btrfs", "qgroup", "show", "--raw", btrfs_path], "retrieving quota info")
     if not success:
         print "It seems quota is not enabled."
         print "Try 'btrfs quota enable %s' first (and wait for the quota scan to finish)." % btrfs_path
         sys.exit(1)
+
+    quota = dict()
+    for line in out.split('\n'):
+        if not re.match("^[0-9]+", line): continue # skip table headers and empty lines
+        cols = [col for col in line.split(' ') if col] # deal with consecutive delimiters
+        # first col = qgroup ID, second col = ref. size, third col = excl. size
+        vol_id = cols[0].split('/')[1]
+        quota[vol_id] = (__human_readable(int(cols[1])), __human_readable(int(cols[2])))
+
+    # determine the widths of columns (spacing and min widths handled in __print_header)
+    for vol_id, vol_name in subvolumes.iteritems():
+        __collen["id"] = max(__collen["id"], len(str(vol_id)))
+        __collen["name"] = max(__collen["name"], len(vol_name))
+
+    __print_header()
+    __print_ruler()
+    for vol_id, vol_name in subvolumes.iteritems():
+        rfer, excl = quota[vol_id]
+        __print_row(vol_id, vol_name, rfer, excl)
+    __print_ruler()
 
 if __name__ == "__main__":
     main()
