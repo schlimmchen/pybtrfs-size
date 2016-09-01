@@ -8,7 +8,7 @@
 import os, subprocess, sys, re
 
 # widths of columns to be printed
-__collen = { "id" : 0, "name" : 0 }
+__collen = { "id" : 0, "name" : 0, "used_lim" : 0, "excl_lim" : 0 }
 
 def __try_command(cmd, description):
     """ executes a command and returns the standard and error output together
@@ -24,9 +24,10 @@ def __try_command(cmd, description):
 
     return (False, None) # error
 
-def __human_size(size):
+def __human_size(size, padding = True):
     """ converts the given int into a human readable size rounded to one
-        digit after the decimal point and padded to a fixed length of 10 """
+        digit after the decimal point and padded to a fixed length of 10 if
+        padding is True """
     # the spaces after the base unit 'B' are for alignment
     powers = { 0 : "B  ", 1 : "KiB", 2 : "MiB", 3 : "GiB", 4 : "TiB", 5 : "EiB" }
     i = 0
@@ -36,36 +37,39 @@ def __human_size(size):
         size /= 1024
     # max value is "1023.9" plus space plus 3 chars for unit = 10 chars
     val = str(round(size, 1)) + ' ' + powers[i]
-    val = " "*(10-len(val)) + val
+    if padding: val = " "*(10-len(val)) + val
     return val
 
 def __human_limit(limit, used):
     """ converts the given limit into a human readable size rounded to one
         digit after the decial point and the percentage used of that limit
-        in a fixed length string of 16 characters """
-    if limit == 0: return "        no limit"
+        or "none" in a variable length string """
+    if limit == 0: return "none"
 
     percentage = str(int(used*100/limit)) + "%"
     percentage = " "*(3-len(percentage)) + percentage
-    return __human_size(limit) + " (" + percentage + ")"
+    return __human_size(limit, False) + " (" + percentage + ")"
 
 def __print_header():
     """ prints the table header with respect for the given column widths """
     __collen["id"] = max(__collen["id"], 2) # min is "ID"
     __collen["name"] = max(__collen["name"], 14) # min is "Subvolume Name"
-    print "ID%s | Subvolume Name %s|       Used |     Limit (Used) |  Exclusive |     Limit (Used)" %\
-        (" "*(__collen["id"]-2), " "*(__collen["name"]-14))
+    __collen["used_lim"] = max(__collen["used_lim"], 10) # min is "Max (Used)"
+    __collen["excl_lim"] = max(__collen["excl_lim"], 10) # min is "Max (Used)"
+    print "ID%s | Subvolume Name %s|       Used | %sMax (Used) |  Exclusive | %sMax (Used)" %\
+        (" "*(__collen["id"]-2), " "*(__collen["name"]-14), " "*(__collen["used_lim"]-10), " "*(__collen["excl_lim"]-10))
 
 def __print_ruler():
     """ prints a ruler with respect for the given column widths """
-    print "%s-+-%s-+-%s-+-%s-+-%s-+-%s" % ("-"*__collen["id"], "-"*__collen["name"], "-"*10, "-"*16, "-"*10, "-"*16)
+    print "%s-+-%s-+-%s-+-%s-+-%s-+-%s" % ("-"*__collen["id"], "-"*__collen["name"], "-"*10, "-"*__collen["used_lim"], "-"*10, "-"*__collen["excl_lim"])
 
 def __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim):
     """ prints a table row with all the relevant information in proper alignment """
-    print "%s%s | %s%s | %s | %s | %s | %s" %\
+    print "%s%s | %s%s | %s | %s%s | %s | %s%s" %\
         (vol_id, " "*(__collen["id"]-len(vol_id)),
          vol_name, " "*(__collen["name"]-len(vol_name)),
-         used, used_lim, excl, excl_lim)
+         used, " "*(__collen["used_lim"]-len(used_lim)), used_lim,
+         excl, " "*(__collen["excl_lim"]-len(excl_lim)), excl_lim)
 
 def __calculate_column_mapping(header_line):
     header = header_line.split()
@@ -87,6 +91,7 @@ def main():
         print "WARNING: This script will probably fail without root privileges!"
 
     # TODO (BKirchen, 2016-09-01): make these configurable via parameters
+    # TODO (BKirchen, 2016-09-01): we need an option to start a quota scan before printing
     btrfs_path = "/"
 
     success, out = __try_command(["btrfs", "subvolume", "list", btrfs_path], "listing subvolumes")
@@ -142,8 +147,11 @@ def main():
 
     # determine the widths of columns (spacing and min widths handled in __print_header)
     for vol_id, vol_name in subvolumes.iteritems():
+        used, excl, used_lim, excl_lim = quota[vol_id]
         __collen["id"] = max(__collen["id"], len(str(vol_id)))
         __collen["name"] = max(__collen["name"], len(vol_name))
+        __collen["used_lim"] = max(__collen["used_lim"], len(used_lim))
+        __collen["excl_lim"] = max(__collen["excl_lim"], len(excl_lim))
 
     __print_header()
     __print_ruler()
