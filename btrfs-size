@@ -1,0 +1,49 @@
+#!/usr/bin/python
+
+import os, subprocess, sys
+
+def __try_command(cmd, description):
+    """ executes a command and returns the standard and error output together
+        with an error indication """
+    try:
+        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT);
+        return (True, out) # success
+    except subprocess.CalledProcessError as e:
+        print "Error while %s, return code is non-zero (%d)" % (description, e.returncode)
+        print "Command: %s" % " ".join(e.cmd)
+        if e.output:
+            print "Output: %s" % e.output.strip()
+
+    return (False, None) # error
+
+def main():
+    if os.geteuid() != 0:
+        print "WARNING: This script will probably fail without root privileges!"
+
+    # TODO (BKirchen, 2016-09-01): make these configurable via parameters
+    btrfs_path = "/"
+
+    subvolumes = list()
+
+    success, out = __try_command(["btrfs", "subvolume", "list", btrfs_path], "listing subvolumes")
+    if not success:
+        # the command output is sufficiently expressive, in error conditions at
+        # least if the path does not exist or if it is not a btrfs filesystem
+        sys.exit(1)
+    if not out:
+        print "It seems there are no subvolumes in this btrfs."
+        sys.exit(0)
+
+    # we need the ninth column of every output line as subvolume name
+    subvolumes = [line.split(' ')[8].strip() for line in out.split('\n') if line.strip()]
+    for vol in subvolumes:
+        print vol
+
+    success, out = __try_command(["btrfs", "qgroup", "show", "--raw", btrfs_path], "retrieving quota info")
+    if not success:
+        print "It seems quota is not enabled."
+        print "Try 'btrfs quota enable %s' first (and wait for the quota scan to finish)." % btrfs_path
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
