@@ -54,6 +54,22 @@ def __print_row(vol_id, vol_name, used, excl):
     print "%s%s | %s%s | %s | %s" % (vol_id, " "*(__collen["id"]-len(vol_id)),
                                      vol_name, " "*(__collen["name"]-len(vol_name)),
                                      used, excl)
+
+def __calculate_column_mapping(header_line):
+    header = header_line.split()
+    if not header[0] == "qgroupid":
+        print "This script is definitely not compatible with the btrfs implementation, sorry..."
+        sys.exit(1)
+
+    col_mapping = dict()
+    i = 0
+    for col in header:
+        if not col: continue # col may be empty due to consecutive delimiters
+        col_mapping[col] = i
+        i += 1
+
+    return col_mapping
+
 def main():
     if os.geteuid() != 0:
         print "WARNING: This script will probably fail without root privileges!"
@@ -83,13 +99,17 @@ def main():
         print "Try 'btrfs quota enable %s' first (and wait for the quota scan to finish)." % btrfs_path
         sys.exit(1)
 
+    # we require a table header in the first line of output to build the column dict
+    col_mapping = __calculate_column_mapping(out.split('\n')[0])
+
     quota = dict()
     for line in out.split('\n'):
-        if not re.match("^[0-9]+", line): continue # skip table headers and empty lines
+        if not re.match("^[0-9]+", line): continue # skip table header, rulers and empty lines
         cols = [col for col in line.split(' ') if col] # deal with consecutive delimiters
-        # first col = qgroup ID, second col = ref. size, third col = excl. size
-        vol_id = cols[0].split('/')[1]
-        quota[vol_id] = (__human_readable(int(cols[1])), __human_readable(int(cols[2])))
+        vol_id = cols[col_mapping["qgroupid"]].split('/')[1]
+        used = __human_readable(int(cols[col_mapping["rfer"]]))
+        excl = __human_readable(int(cols[col_mapping["excl"]]))
+        quota[vol_id] = (used, excl)
 
     # determine the widths of columns (spacing and min widths handled in __print_header)
     for vol_id, vol_name in subvolumes.iteritems():
