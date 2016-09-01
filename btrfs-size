@@ -24,9 +24,9 @@ def __try_command(cmd, description):
 
     return (False, None) # error
 
-def __human_readable(size):
+def __human_size(size):
     """ converts the given int into a human readable size rounded to one
-        digit after the decimal point and padded to a fixed string length """
+        digit after the decimal point and padded to a fixed length of 10 """
     # the spaces after the base unit 'B' are for alignment
     powers = { 0 : "B  ", 1 : "KiB", 2 : "MiB", 3 : "GiB", 4 : "TiB", 5 : "EiB" }
     i = 0
@@ -39,21 +39,33 @@ def __human_readable(size):
     val = " "*(10-len(val)) + val
     return val
 
+def __human_limit(limit, used):
+    """ converts the given limit into a human readable size rounded to one
+        digit after the decial point and the percentage used of that limit
+        in a fixed length string of 16 characters """
+    if limit == 0: return "        no limit"
+
+    percentage = str(int(used*100/limit)) + "%"
+    percentage = " "*(3-len(percentage)) + percentage
+    return __human_size(limit) + " (" + percentage + ")"
+
 def __print_header():
     """ prints the table header with respect for the given column widths """
     __collen["id"] = max(__collen["id"], 2) # min is "ID"
     __collen["name"] = max(__collen["name"], 14) # min is "Subvolume Name"
-    print "ID%s | Subvolume Name %s|       Used |  Exclusive" % (" "*(__collen["id"]-2), " "*(__collen["name"]-14))
+    print "ID%s | Subvolume Name %s|       Used |     Limit (Used) |  Exclusive |     Limit (Used)" %\
+        (" "*(__collen["id"]-2), " "*(__collen["name"]-14))
 
 def __print_ruler():
     """ prints a ruler with respect for the given column widths """
-    print "%s-+-%s-+-%s-+-%s" % ("-"*__collen["id"], "-"*__collen["name"], "-"*10, "-"*10)
+    print "%s-+-%s-+-%s-+-%s-+-%s-+-%s" % ("-"*__collen["id"], "-"*__collen["name"], "-"*10, "-"*16, "-"*10, "-"*16)
 
-def __print_row(vol_id, vol_name, used, excl):
+def __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim):
     """ prints a table row with all the relevant information in proper alignment """
-    print "%s%s | %s%s | %s | %s" % (vol_id, " "*(__collen["id"]-len(vol_id)),
-                                     vol_name, " "*(__collen["name"]-len(vol_name)),
-                                     used, excl)
+    print "%s%s | %s%s | %s | %s | %s | %s" %\
+        (vol_id, " "*(__collen["id"]-len(vol_id)),
+         vol_name, " "*(__collen["name"]-len(vol_name)),
+         used, used_lim, excl, excl_lim)
 
 def __calculate_column_mapping(header_line):
     header = header_line.split()
@@ -93,7 +105,7 @@ def main():
         # second col = subvol ID, ninth col = subvol name
         subvolumes[cols[1].strip()] = cols[8].strip()
 
-    success, out = __try_command(["btrfs", "qgroup", "show", "--raw", btrfs_path], "retrieving quota info")
+    success, out = __try_command(["btrfs", "qgroup", "show", "--raw", "-r", "-e", btrfs_path], "retrieving quota info")
     if not success:
         print "It seems quota is not enabled."
         print "Try 'btrfs quota enable %s' first (and wait for the quota scan to finish)." % btrfs_path
@@ -107,9 +119,26 @@ def main():
         if not re.match("^[0-9]+", line): continue # skip table header, rulers and empty lines
         cols = [col for col in line.split(' ') if col] # deal with consecutive delimiters
         vol_id = cols[col_mapping["qgroupid"]].split('/')[1]
-        used = __human_readable(int(cols[col_mapping["rfer"]]))
-        excl = __human_readable(int(cols[col_mapping["excl"]]))
-        quota[vol_id] = (used, excl)
+        used = int(cols[col_mapping["rfer"]])
+        excl = int(cols[col_mapping["excl"]])
+        used_lim = 0
+        try:
+            used_lim = int(cols[col_mapping["max_rfer"]])
+        except ValueError:
+            pass # variable is zero already
+        used_lim = __human_limit(used_lim, used)
+
+        excl_lim = 0
+        try:
+            excl_lim = int(cols[col_mapping["max_excl"]])
+        except ValueError:
+            pass # variable is zero already
+        excl_lim = __human_limit(excl_lim, excl)
+
+        used = __human_size(int(cols[col_mapping["rfer"]]))
+        excl = __human_size(int(cols[col_mapping["excl"]]))
+
+        quota[vol_id] = (used, excl, used_lim, excl_lim)
 
     # determine the widths of columns (spacing and min widths handled in __print_header)
     for vol_id, vol_name in subvolumes.iteritems():
@@ -119,8 +148,8 @@ def main():
     __print_header()
     __print_ruler()
     for vol_id, vol_name in subvolumes.iteritems():
-        rfer, excl = quota[vol_id]
-        __print_row(vol_id, vol_name, rfer, excl)
+        used, excl, used_lim, excl_lim = quota[vol_id]
+        __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim)
     __print_ruler()
 
 if __name__ == "__main__":
