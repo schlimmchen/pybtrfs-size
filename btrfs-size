@@ -7,8 +7,11 @@
 
 import os, subprocess, sys, re
 
-# widths of columns to be printed
+# widths of variable-width columns to be printed
 __collen = { "id" : 0, "name" : 0, "used_lim" : 0, "excl_lim" : 0 }
+
+# maximum amount of chars to display a human readable size of any quota value
+MAX_SIZE = 10 # max value is "1023.9" plus space plus 3 chars for unit
 
 def __try_command(cmd, description):
     """ executes a command and returns the standard and error output together
@@ -26,8 +29,8 @@ def __try_command(cmd, description):
 
 def __human_size(size, padding = True):
     """ converts the given int into a human readable size rounded to one
-        digit after the decimal point and padded to a fixed length of 10 if
-        padding is True """
+        digit after the decimal point and padded to a fixed length of MAX_SIZE
+        if padding is True """
     # the spaces after the base unit 'B' are for alignment
     powers = { 0 : "B  ", 1 : "KiB", 2 : "MiB", 3 : "GiB", 4 : "TiB", 5 : "EiB" }
     i = 0
@@ -35,9 +38,8 @@ def __human_size(size, padding = True):
     while size >= 1024:
         i += 1
         size /= 1024
-    # max value is "1023.9" plus space plus 3 chars for unit = 10 chars
     val = str(round(size, 1)) + ' ' + powers[i]
-    if padding: val = " "*(10-len(val)) + val
+    if padding: val = " "*(MAX_SIZE-len(val)) + val
     return val
 
 def __human_limit(limit, used):
@@ -56,12 +58,23 @@ def __print_header():
     __collen["name"] = max(__collen["name"], 14) # min is "Subvolume Name"
     __collen["used_lim"] = max(__collen["used_lim"], 10) # min is "Max (Used)"
     __collen["excl_lim"] = max(__collen["excl_lim"], 11) # min is "Max (Excl.)"
-    print "ID%s | Subvolume Name %s|       Used | %sMax (Used) |  Exclusive | %sMax (Excl.)" %\
-        (" "*(__collen["id"]-2), " "*(__collen["name"]-14), " "*(__collen["used_lim"]-10), " "*(__collen["excl_lim"]-11))
+    print "ID%s | Subvolume Name%s | %sUsed | %sMax (Used) | %sExclusive | %sMax (Excl.)" %\
+        (" "*(__collen["id"]-2),
+         " "*(__collen["name"]-14),
+         " "*(MAX_SIZE-4),
+         " "*(__collen["used_lim"]-10),
+         " "*(MAX_SIZE-9),
+         " "*(__collen["excl_lim"]-11))
 
 def __print_ruler():
     """ prints a ruler with respect for the given column widths """
-    print "%s-+-%s-+-%s-+-%s-+-%s-+-%s" % ("-"*__collen["id"], "-"*__collen["name"], "-"*10, "-"*__collen["used_lim"], "-"*10, "-"*__collen["excl_lim"])
+    print "%s-+-%s-+-%s-+-%s-+-%s-+-%s" %\
+            ("-"*__collen["id"],
+             "-"*__collen["name"],
+             "-"*MAX_SIZE,
+             "-"*__collen["used_lim"],
+             "-"*MAX_SIZE,
+             "-"*__collen["excl_lim"])
 
 def __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim):
     """ prints a table row with all the relevant information in proper alignment """
@@ -75,7 +88,7 @@ def __print_excl_sum(excl_sum):
     """ prints the sum of exclusively used data for all subvolumes """
     label = "Sum: "
     col_sep_len = 4 * 3 # amount of column seperation and padding characters skipped
-    excl_col_start = __collen['id'] + __collen['name'] + 10 + __collen['used_lim'] + col_sep_len
+    excl_col_start = __collen['id'] + __collen['name'] + MAX_SIZE + __collen['used_lim'] + col_sep_len
     print "%s%s%s" % (" "*(excl_col_start - len(label)), label, __human_size(excl_sum))
 
 def __calculate_column_mapping(header_line):
