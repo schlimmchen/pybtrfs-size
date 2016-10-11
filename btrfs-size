@@ -55,9 +55,9 @@ def __print_header():
     __collen["id"] = max(__collen["id"], 2) # min is "ID"
     __collen["name"] = max(__collen["name"], 14) # min is "Subvolume Name"
     __collen["used_lim"] = max(__collen["used_lim"], 10) # min is "Max (Used)"
-    __collen["excl_lim"] = max(__collen["excl_lim"], 10) # min is "Max (Used)"
-    print "ID%s | Subvolume Name %s|       Used | %sMax (Used) |  Exclusive | %sMax (Used)" %\
-        (" "*(__collen["id"]-2), " "*(__collen["name"]-14), " "*(__collen["used_lim"]-10), " "*(__collen["excl_lim"]-10))
+    __collen["excl_lim"] = max(__collen["excl_lim"], 11) # min is "Max (Excl.)"
+    print "ID%s | Subvolume Name %s|       Used | %sMax (Used) |  Exclusive | %sMax (Excl.)" %\
+        (" "*(__collen["id"]-2), " "*(__collen["name"]-14), " "*(__collen["used_lim"]-10), " "*(__collen["excl_lim"]-11))
 
 def __print_ruler():
     """ prints a ruler with respect for the given column widths """
