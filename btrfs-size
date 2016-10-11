@@ -94,7 +94,7 @@ def main():
     # TODO (BKirchen, 2016-09-01): we need an option to start a quota scan before printing
     btrfs_path = "/"
 
-    success, out = __try_command(["btrfs", "subvolume", "list", btrfs_path], "listing subvolumes")
+    success, out = __try_command(["btrfs", "subvolume", "list", "--sort", "path", btrfs_path], "listing subvolumes")
     if not success:
         # the command output is sufficiently expressive, in error conditions at
         # least if the path does not exist or if it is not a btrfs filesystem
@@ -104,11 +104,13 @@ def main():
         sys.exit(0)
 
     subvolumes = dict()
+    subvol_order = list()
     for line in out.split('\n'):
         if not line: continue
         cols = line.split(' ')
         # second col = subvol ID, ninth col = subvol name
         subvolumes[cols[1].strip()] = cols[8].strip()
+        subvol_order.append(cols[1].strip())
 
     success, out = __try_command(["btrfs", "qgroup", "show", "--raw", "-r", "-e", btrfs_path], "retrieving quota info")
     if not success:
@@ -155,7 +157,8 @@ def main():
 
     __print_header()
     __print_ruler()
-    for vol_id, vol_name in subvolumes.iteritems():
+    for vol_id in subvol_order:
+        vol_name = subvolumes[vol_id]
         used, excl, used_lim, excl_lim = quota[vol_id]
         __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim)
     __print_ruler()
