@@ -71,6 +71,13 @@ def __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim):
          used, " "*(__collen["used_lim"]-len(used_lim)), used_lim,
          excl, " "*(__collen["excl_lim"]-len(excl_lim)), excl_lim)
 
+def __print_excl_sum(excl_sum):
+    """ prints the sum of exclusively used data for all subvolumes """
+    label = "Sum: "
+    col_sep_len = 4 * 3 # amount of column seperation and padding characters skipped
+    excl_col_start = __collen['id'] + __collen['name'] + 10 + __collen['used_lim'] + col_sep_len
+    print "%s%s%s" % (" "*(excl_col_start - len(label)), label, __human_size(excl_sum))
+
 def __calculate_column_mapping(header_line):
     header = header_line.split()
     if not header[0] == "qgroupid":
@@ -143,13 +150,14 @@ def main():
         excl_lim = __human_limit(excl_lim, excl)
 
         used = __human_size(int(cols[col_mapping["rfer"]]))
-        excl = __human_size(int(cols[col_mapping["excl"]]))
+        excl_raw = int(cols[col_mapping["excl"]])
+        excl = __human_size(excl_raw)
 
-        quota[vol_id] = (used, excl, used_lim, excl_lim)
+        quota[vol_id] = (used, excl, excl_raw, used_lim, excl_lim)
 
     # determine the widths of columns (spacing and min widths handled in __print_header)
     for vol_id, vol_name in subvolumes.iteritems():
-        used, excl, used_lim, excl_lim = quota[vol_id]
+        used, excl, excl_raw, used_lim, excl_lim = quota[vol_id]
         __collen["id"] = max(__collen["id"], len(str(vol_id)))
         __collen["name"] = max(__collen["name"], len(vol_name))
         __collen["used_lim"] = max(__collen["used_lim"], len(used_lim))
@@ -157,11 +165,14 @@ def main():
 
     __print_header()
     __print_ruler()
+    excl_sum = 0
     for vol_id in subvol_order:
         vol_name = subvolumes[vol_id]
-        used, excl, used_lim, excl_lim = quota[vol_id]
+        used, excl, excl_raw, used_lim, excl_lim = quota[vol_id]
+        excl_sum += excl_raw
         __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim)
     __print_ruler()
+    __print_excl_sum(excl_sum)
 
 if __name__ == "__main__":
     main()
