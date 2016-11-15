@@ -146,6 +146,18 @@ def main():
     for line in out.split('\n'):
         if not re.match("^[0-9]+", line): continue # skip table header, rulers and empty lines
         cols = [col for col in line.split(' ') if col] # deal with consecutive delimiters
+
+        # we only support displaying subvol specific quota and do not want
+        # to overwrite quota limits for a subvolume with a higher level
+        # qgroup's quota useing the subvolume's ID as second number by chance
+        try:
+            qgroup_level = int(cols[col_mapping["qgroupid"]].split('/')[0])
+        except ValueError:
+            print "Found non-numeric quota group ID. Aborting."
+            sys.exit(1)
+
+        if qgroup_level > 0: continue
+
         vol_id = cols[col_mapping["qgroupid"]].split('/')[1]
         used = int(cols[col_mapping["rfer"]])
         excl = int(cols[col_mapping["excl"]])
