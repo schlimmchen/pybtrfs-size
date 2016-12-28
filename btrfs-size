@@ -33,12 +33,16 @@ def __human_size(size, padding = True):
         digit after the decimal point and padded to a fixed length of MAX_SIZE
         if padding is True """
     # the spaces after the base unit 'B' are for alignment
-    powers = { 0 : "B  ", 1 : "KiB", 2 : "MiB", 3 : "GiB", 4 : "TiB", 5 : "EiB" }
+    powers = { 0 : "B  ", 1 : "KiB", 2 : "MiB", 3 : "GiB", 4 : "TiB", 5 : "PiB", 6 : "EiB" }
     i = 0
+    orig_size = size
     size = float(size)
     while size >= 1024:
         i += 1
         size /= 1024
+    if i > 6:
+        print "Not prepared to handle this number: %d" % orig_size
+        return "NaN"
     val = str(round(size, 1)) + ' ' + powers[i]
     if padding: val = " "*(MAX_SIZE-len(val)) + val
     return val
