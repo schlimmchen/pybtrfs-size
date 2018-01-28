@@ -156,7 +156,7 @@ def main():
 
         # we only support displaying subvol specific quota and do not want
         # to overwrite quota limits for a subvolume with a higher level
-        # qgroup's quota useing the subvolume's ID as second number by chance
+        # qgroup's quota using the subvolume's ID as second number by chance
         try:
             qgroup_level = int(cols[col_mapping["qgroupid"]].split('/')[0])
         except ValueError:
