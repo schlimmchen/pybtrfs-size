@@ -117,10 +117,18 @@ def main():
 
     parser = argparse.ArgumentParser(description="btrfs subvolume overview generator")
     parser.add_argument("path", nargs="?", default="/", help="path to btrfs filesystem of interest (defaults to '/')")
+    parser.add_argument("--rescan", action="store_true", default=False, help="do a blocking quota rescan before processing quota information")
     params = parser.parse_args()
 
-    # TODO (BKirchen, 2016-09-01): we need an option to start a quota scan before printing
     btrfs_path = params.path
+
+    if params.rescan:
+        print "Rescanning quota. This might take a while..."
+        success, out = __try_command(["btrfs", "quota", "rescan", "-w", btrfs_path], "rescanning quota")
+        if not success:
+            print "It seems quota is not enabled."
+            print "Try 'btrfs quota enable %s' first (and wait for the quota scan to finish)." % btrfs_path
+            sys.exit(1)
 
     success, out = __try_command(["btrfs", "subvolume", "list", "--sort", "path", btrfs_path], "listing subvolumes")
     if not success:
