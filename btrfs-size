@@ -6,7 +6,7 @@
 
 # this file is licensed unter the MIT license. see file LICENSE.
 
-import os, subprocess, sys, re
+import os, subprocess, sys, re, argparse
 
 # widths of variable-width columns to be printed
 __collen = { "id" : 0, "name" : 0, "used_lim" : 0, "excl_lim" : 0 }
@@ -115,9 +115,12 @@ def main():
     if os.geteuid() != 0:
         print "WARNING: This script will probably fail without root privileges!"
 
-    # TODO (BKirchen, 2016-09-01): make these configurable via parameters
+    parser = argparse.ArgumentParser(description="btrfs subvolume overview generator")
+    parser.add_argument("path", nargs="?", default="/", help="path to btrfs filesystem of interest (defaults to '/')")
+    params = parser.parse_args()
+
     # TODO (BKirchen, 2016-09-01): we need an option to start a quota scan before printing
-    btrfs_path = "/"
+    btrfs_path = params.path
 
     success, out = __try_command(["btrfs", "subvolume", "list", "--sort", "path", btrfs_path], "listing subvolumes")
     if not success:
@@ -193,6 +196,7 @@ def main():
         __collen["used_lim"] = max(__collen["used_lim"], len(used_lim))
         __collen["excl_lim"] = max(__collen["excl_lim"], len(excl_lim))
 
+    print "subvolume information for btrfs filesystem at '%s':\n" % btrfs_path
     __print_header()
     __print_ruler()
     excl_sum = 0
