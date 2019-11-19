@@ -198,15 +198,16 @@ def main():
             pass # variable is zero already
         excl_lim = __human_limit(excl_lim, excl)
 
-        used = __human_size(int(cols[col_mapping["rfer"]]))
-        excl_raw = int(cols[col_mapping["excl"]])
-        excl = __human_size(excl_raw)
+        quota[vol_id] = (used, excl, used_lim, excl_lim)
 
-        quota[vol_id] = (used, excl, excl_raw, used_lim, excl_lim)
+    # test whether any subvolume uses data
+    if not any([used > 0 for vol_id, (used, a, b, c) in quota.items()]):
+        print("found {:d} subvolumes, but none use space (quota inconsistent? re-run with --rescan)".format(len(quota)))
+        sys.exit(0)
 
     # determine the widths of columns (spacing and min widths handled in __print_header)
     for vol_id, vol_name in subvolumes.items():
-        used, excl, excl_raw, used_lim, excl_lim = quota[vol_id]
+        used, excl, used_lim, excl_lim = quota[vol_id]
         __collen["id"] = max(__collen["id"], len(str(vol_id)))
         __collen["name"] = max(__collen["name"], len(vol_name))
         __collen["used_lim"] = max(__collen["used_lim"], len(used_lim))
@@ -218,9 +219,9 @@ def main():
     excl_sum = 0
     for vol_id in subvol_order:
         vol_name = subvolumes[vol_id]
-        used, excl, excl_raw, used_lim, excl_lim = quota[vol_id]
-        excl_sum += excl_raw
-        __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim)
+        used, excl, used_lim, excl_lim = quota[vol_id]
+        excl_sum += excl
+        __print_row(vol_id, vol_name, __human_size(used), used_lim, __human_size(excl), excl_lim)
     __print_ruler()
     __print_excl_sum(excl_sum)
 
