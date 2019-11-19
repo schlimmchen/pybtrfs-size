@@ -96,20 +96,29 @@ def __print_excl_sum(excl_sum):
     excl_col_start = __collen['id'] + __collen['name'] + MAX_SIZE + __collen['used_lim'] + col_sep_len
     print "%s%s%s" % (" "*(excl_col_start - len(label)), label, __human_size(excl_sum))
 
-def __calculate_column_mapping(header_line):
-    header = header_line.split()
-    if not header[0] == "qgroupid":
-        print "This script is definitely not compatible with the btrfs implementation, sorry..."
-        sys.exit(1)
+def __calculate_column_mapping(table):
+    for line in table:
+        if line.lower().startswith("warning"):
+            print line;
+            continue
 
-    col_mapping = dict()
-    i = 0
-    for col in header:
-        if not col: continue # col may be empty due to consecutive delimiters
-        col_mapping[col] = i
-        i += 1
+        header = line.split()
+        if not header[0] == "qgroupid":
+            continue
 
-    return col_mapping
+        col_mapping = dict()
+        i = 0
+        for col in header:
+            if not col: continue # col may be empty due to consecutive delimiters
+            col_mapping[col] = i
+            i += 1
+
+        return col_mapping
+
+    print "This script is not compatible with your btrfs implementation, sorry..."
+    sys.exit(1)
+
+    return dict()
 
 def main():
     if os.geteuid() != 0:
@@ -154,8 +163,7 @@ def main():
         print "Try 'btrfs quota enable %s' first (and wait for the quota scan to finish)." % btrfs_path
         sys.exit(1)
 
-    # we require a table header in the first line of output to build the column dict
-    col_mapping = __calculate_column_mapping(out.split('\n')[0])
+    col_mapping = __calculate_column_mapping(out.split('\n'))
 
     quota = dict()
     for line in out.split('\n'):
