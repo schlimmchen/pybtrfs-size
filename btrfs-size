@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # author: Bernhard Kirchen <schlimmchen@posteo.net>
 # inspired by Kyle Agronick <agronick@gmail.com>
@@ -19,12 +19,12 @@ def __try_command(cmd, description):
         with an error indication """
     try:
         out = subprocess.check_output(cmd, stderr=subprocess.STDOUT);
-        return (True, out) # success
+        return (True, out.decode("utf-8")) # success
     except subprocess.CalledProcessError as e:
-        print "Error while %s, return code is non-zero (%d)" % (description, e.returncode)
-        print "Command: %s" % " ".join(e.cmd)
+        print("Error while {:s}, return code is non-zero ({:d})".format(description, e.returncode))
+        print("Command: {:s}".format(" ".join(e.cmd)))
         if e.output:
-            print "Output: %s" % e.output.strip()
+            print("Output: {:s}".format(e.output.decode("utf-8").strip()))
 
     return (False, None) # error
 
@@ -41,7 +41,7 @@ def __human_size(size, padding = True):
         i += 1
         size /= 1024
     if i > 6:
-        print "Not prepared to handle this number: %d" % orig_size
+        print("Not prepared to handle this number: {:d}".format(orig_size))
         return "NaN"
     val = str(round(size, 1)) + ' ' + powers[i]
     if padding: val = " "*(MAX_SIZE-len(val)) + val
@@ -63,43 +63,43 @@ def __print_header():
     __collen["name"] = max(__collen["name"], 14) # min is "Subvolume Name"
     __collen["used_lim"] = max(__collen["used_lim"], 10) # min is "Max (Used)"
     __collen["excl_lim"] = max(__collen["excl_lim"], 11) # min is "Max (Excl.)"
-    print "ID%s | Subvolume Name%s | %sUsed | %sMax (Used) | %sExclusive | %sMax (Excl.)" %\
-        (" "*(__collen["id"]-2),
+    print("ID{:s} | Subvolume Name{:s} | {:s}Used | {:s}Max (Used) | {:s}Exclusive | {:s}Max (Excl.)".format(
+         " "*(__collen["id"]-2),
          " "*(__collen["name"]-14),
          " "*(MAX_SIZE-4),
          " "*(__collen["used_lim"]-10),
          " "*(MAX_SIZE-9),
-         " "*(__collen["excl_lim"]-11))
+         " "*(__collen["excl_lim"]-11)))
 
 def __print_ruler():
     """ prints a ruler with respect for the given column widths """
-    print "%s-+-%s-+-%s-+-%s-+-%s-+-%s" %\
-            ("-"*__collen["id"],
+    print("{:s}-+-{:s}-+-{:s}-+-{:s}-+-{:s}-+-{:s}".format(
+             "-"*__collen["id"],
              "-"*__collen["name"],
              "-"*MAX_SIZE,
              "-"*__collen["used_lim"],
              "-"*MAX_SIZE,
-             "-"*__collen["excl_lim"])
+             "-"*__collen["excl_lim"]))
 
 def __print_row(vol_id, vol_name, used, used_lim, excl, excl_lim):
     """ prints a table row with all the relevant information in proper alignment """
-    print "%s%s | %s%s | %s | %s%s | %s | %s%s" %\
-        (vol_id, " "*(__collen["id"]-len(vol_id)),
+    print("{:s}{:s} | {:s}{:s} | {:s} | {:s}{:s} | {:s} | {:s}{:s}".format(
+         vol_id, " "*(__collen["id"]-len(vol_id)),
          vol_name, " "*(__collen["name"]-len(vol_name)),
          used, " "*(__collen["used_lim"]-len(used_lim)), used_lim,
-         excl, " "*(__collen["excl_lim"]-len(excl_lim)), excl_lim)
+         excl, " "*(__collen["excl_lim"]-len(excl_lim)), excl_lim))
 
 def __print_excl_sum(excl_sum):
     """ prints the sum of exclusively used data for all subvolumes """
     label = "Sum: "
     col_sep_len = 4 * 3 # amount of column seperation and padding characters skipped
     excl_col_start = __collen['id'] + __collen['name'] + MAX_SIZE + __collen['used_lim'] + col_sep_len
-    print "%s%s%s" % (" "*(excl_col_start - len(label)), label, __human_size(excl_sum))
+    print("{:s}{:s}{:s}".format(" "*(excl_col_start - len(label)), label, __human_size(excl_sum)))
 
 def __calculate_column_mapping(table):
     for line in table:
         if line.lower().startswith("warning"):
-            print line;
+            print(line);
             continue
 
         header = line.split()
@@ -115,14 +115,14 @@ def __calculate_column_mapping(table):
 
         return col_mapping
 
-    print "This script is not compatible with your btrfs implementation, sorry..."
+    print("This script is not compatible with your btrfs implementation, sorry...")
     sys.exit(1)
 
     return dict()
 
 def main():
     if os.geteuid() != 0:
-        print "WARNING: This script will probably fail without root privileges!"
+        print("WARNING: This script will probably fail without root privileges!")
 
     parser = argparse.ArgumentParser(description="btrfs subvolume overview generator")
     parser.add_argument("path", nargs="?", default="/", help="path to btrfs filesystem of interest (defaults to '/')")
@@ -132,11 +132,11 @@ def main():
     btrfs_path = params.path
 
     if params.rescan:
-        print "Rescanning quota. This might take a while..."
+        print("Rescanning quota. This might take a while...")
         success, out = __try_command(["btrfs", "quota", "rescan", "-w", btrfs_path], "rescanning quota")
         if not success:
-            print "It seems quota is not enabled."
-            print "Try 'btrfs quota enable %s' first (and wait for the quota scan to finish)." % btrfs_path
+            print("It seems quota is not enabled.")
+            print("Try 'btrfs quota enable {:s}' first (and wait for the quota scan to finish).".format(btrfs_path))
             sys.exit(1)
 
     success, out = __try_command(["btrfs", "subvolume", "list", "--sort", "path", btrfs_path], "listing subvolumes")
@@ -145,7 +145,7 @@ def main():
         # least if the path does not exist or if it is not a btrfs filesystem
         sys.exit(1)
     if not out:
-        print "It seems there are no subvolumes in this btrfs."
+        print("It seems there are no subvolumes in this btrfs.")
         sys.exit(0)
 
     subvolumes = dict()
@@ -159,8 +159,8 @@ def main():
 
     success, out = __try_command(["btrfs", "qgroup", "show", "--raw", "-r", "-e", btrfs_path], "retrieving quota info")
     if not success:
-        print "It seems quota is not enabled."
-        print "Try 'btrfs quota enable %s' first (and wait for the quota scan to finish)." % btrfs_path
+        print("It seems quota is not enabled.")
+        print("Try 'btrfs quota enable {:s}' first (and wait for the quota scan to finish).".format(btrfs_path))
         sys.exit(1)
 
     col_mapping = __calculate_column_mapping(out.split('\n'))
@@ -176,7 +176,7 @@ def main():
         try:
             qgroup_level = int(cols[col_mapping["qgroupid"]].split('/')[0])
         except ValueError:
-            print "Found non-numeric quota group ID. Aborting."
+            print("Found non-numeric quota group ID. Aborting.")
             sys.exit(1)
 
         if qgroup_level > 0: continue
@@ -205,14 +205,14 @@ def main():
         quota[vol_id] = (used, excl, excl_raw, used_lim, excl_lim)
 
     # determine the widths of columns (spacing and min widths handled in __print_header)
-    for vol_id, vol_name in subvolumes.iteritems():
+    for vol_id, vol_name in subvolumes.items():
         used, excl, excl_raw, used_lim, excl_lim = quota[vol_id]
         __collen["id"] = max(__collen["id"], len(str(vol_id)))
         __collen["name"] = max(__collen["name"], len(vol_name))
         __collen["used_lim"] = max(__collen["used_lim"], len(used_lim))
         __collen["excl_lim"] = max(__collen["excl_lim"], len(excl_lim))
 
-    print "subvolume information for btrfs filesystem at '%s':\n" % btrfs_path
+    print("subvolume information for btrfs filesystem at '{:s}':\n".format(btrfs_path))
     __print_header()
     __print_ruler()
     excl_sum = 0
